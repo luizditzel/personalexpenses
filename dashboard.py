@@ -53,19 +53,24 @@ col3.metric("Saldo", f"R$ {balance:,.2f}")
 # GRÁFICOS
 # =====================
 
-# Evolução mensal
+# 1) Evolução mensal Receita vs Despesa
 st.subheader("📈 Evolução Mensal (Receita vs Despesa)")
 monthly_summary = df_filtered.groupby(["Month", "Transaction"])["Amount"].sum().reset_index()
 fig_line = px.line(monthly_summary, x="Month", y="Amount", color="Transaction",
                    title="Receita e Despesa por Mês", markers=True)
 st.plotly_chart(fig_line, use_container_width=True)
 
-# =====================
-# NOVO: Gráfico por categoria com seletor de mês
-# =====================
+# 2) NOVO: Evolução das despesas por categoria
+st.subheader("📊 Evolução das Despesas por Categoria")
+df_expenses = df_filtered[df_filtered["Transaction"] == "Expense"]
+evolution_by_cat = df_expenses.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+fig_cat_evolution = px.line(evolution_by_cat, x="Month", y="Amount", color="Category",
+                             title="Evolução das Despesas por Categoria", markers=True)
+st.plotly_chart(fig_cat_evolution, use_container_width=True)
+
+# 3) Gastos por Categoria (Selecionar Mês)
 st.subheader("📊 Gastos por Categoria (Selecionar Mês)")
 month_for_bar = st.selectbox("Selecione um mês para analisar categorias", months)
-
 df_month = df_filtered[(df_filtered["Month"] == month_for_bar) & (df_filtered["Transaction"] == "Expense")]
 expenses_by_cat_month = df_month.groupby("Category")["Amount"].sum().reset_index().sort_values("Amount", ascending=False)
 
@@ -79,9 +84,7 @@ fig_bar_month = px.bar(
 )
 st.plotly_chart(fig_bar_month, use_container_width=True)
 
-# =====================
-# Pizza - Receita vs Despesa
-# =====================
+# 4) Receita vs Despesa (Pizza)
 st.subheader("🥧 Receita vs Despesa")
 summary = {"Receita": total_income, "Despesa": total_expenses}
 fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()), title="Receita vs Despesa")
