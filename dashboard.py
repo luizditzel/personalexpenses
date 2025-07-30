@@ -89,6 +89,38 @@ st.subheader("🥧 Receita vs Despesa")
 summary = {"Receita": total_income, "Despesa": total_expenses}
 fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()), title="Receita vs Despesa")
 st.plotly_chart(fig_pie, use_container_width=True)
+# =====================
+# NOVO: Top 5 Categorias ao longo dos meses
+# =====================
+st.subheader("🔥 Top 5 Categorias de Gastos ao Longo dos Meses")
+
+# Considerar apenas despesas
+df_expenses = df_filtered[df_filtered["Transaction"] == "Expense"]
+
+# Descobrir as 5 maiores categorias no total do período filtrado
+top_categories = (
+    df_expenses.groupby("Category")["Amount"].sum()
+    .sort_values(ascending=False)
+    .head(5)
+    .index.tolist()
+)
+
+# Filtrar somente as top 5
+df_top5 = df_expenses[df_expenses["Category"].isin(top_categories)]
+
+# Agrupar por mês + categoria
+df_top5_summary = df_top5.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+
+# Criar gráfico de barras empilhadas
+fig_top5 = px.bar(
+    df_top5_summary,
+    x="Month",
+    y="Amount",
+    color="Category",
+    title="Top 5 Categorias de Gastos por Mês",
+    text_auto=True
+)
+st.plotly_chart(fig_top5, use_container_width=True)
 
 # =====================
 # TABELA FILTRADA
