@@ -33,21 +33,25 @@ df_filtered = df[
     (df["Category"].isin(selected_categories)) &
     (df["Transaction"].isin(selected_types))
 ]
+# Separar Savings das outras despesas
+df_investments = df_filtered[(df_filtered["Transaction"] == "Expense") & (df_filtered["Category"] == "Savings")]
+df_expenses_no_savings = df_filtered[(df_filtered["Transaction"] == "Expense") & (df_filtered["Category"] != "Savings")]
 
-# =====================
-# KPIs
-# =====================
-total_expenses = df_filtered[df_filtered["Transaction"] == "Expense"]["Amount"].sum()
+# KPIs ajustados
+total_expenses = df_expenses_no_savings["Amount"].sum()
 total_income = df_filtered[df_filtered["Transaction"] == "Income"]["Amount"].sum()
-balance = total_income - total_expenses
+total_investments = df_investments["Amount"].sum()
+balance = total_income - (total_expenses + total_investments)
+
 
 st.title("📊 Dashboard Financeiro")
 st.markdown("Visualização interativa de receitas e despesas")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Despesas", f"R$ {total_expenses:,.2f}")
 col2.metric("Total Receitas", f"R$ {total_income:,.2f}")
-col3.metric("Saldo", f"R$ {balance:,.2f}")
+col3.metric("Investimentos", f"R$ {total_investments:,.2f}")
+col4.metric("Saldo", f"R$ {balance:,.2f}")
 
 # =====================
 # GRÁFICOS
@@ -60,67 +64,72 @@ fig_line = px.line(monthly_summary, x="Month", y="Amount", color="Transaction",
                    title="Receita e Despesa por Mês", markers=True)
 st.plotly_chart(fig_line, use_container_width=True)
 
-# 2) NOVO: Evolução das despesas por categoria
+# 2) Evolução das Despesas por Categoria
 st.subheader("📊 Evolução das Despesas por Categoria")
-df_expenses = df_filtered[df_filtered["Transaction"] == "Expense"]
-evolution_by_cat = df_expenses.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-fig_cat_evolution = px.line(evolution_by_cat, x="Month", y="Amount", color="Category",
-                             title="Evolução das Despesas por Categoria", markers=True)
-st.plotly_chart(fig_cat_evolution, use_container_width=True)
+if not df_expenses_no_savings.empty:
+    evolution_by_cat = df_expenses_no_savings.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+    fig_cat_evolution = px.line(evolution_by_cat, x="Month", y="Amount", color="Category",
+                                 title="Evolução das Despesas por Categoria", markers=True)
+    st.plotly_chart(fig_cat_evolution, use_container_width=True)
+else:
+    st.info("Nenhuma despesa encontrada no período selecionado.")
+    
+# 3) Top 5 Categorias ao longo dos meses
+st.subheader("🔥 Top 5 Categorias de Gastos ao Longo dos Meses")
+if not df_expenses_no_savings.empty:
+    top_categories = (
+        df_expenses_no_savings.groupby("Category")["Amount"].sum()
+        .sort_values(ascending=False)
+        .head(5)
+        .index.tolist()
+    )
+    df_top5 = df_expenses_no_savings[df_expenses_no_savings["Category"].isin(top_categories)]
+    df_top5_summary = df_top5.groupby(["Month", "Category"])["Amount"].sum().reset_index()
+    fig_top5 = px.bar(
+        df_top5_summary,
+        x="Month",
+        y="Amount",
+        color="Category",
+        title="Top 5 Categorias de Gastos por Mês",
+        text_auto=True
+    )
+    st.plotly_chart(fig_top5, use_container_width=True)
+else:
+    st.info("Não há despesas para calcular as Top 5 categorias.")
 
-# 3) Gastos por Categoria (Selecionar Mês)
+# 4) Gastos por Categoria (Selecionar Mês)
 st.subheader("📊 Gastos por Categoria (Selecionar Mês)")
 month_for_bar = st.selectbox("Selecione um mês para analisar categorias", months)
-df_month = df_filtered[(df_filtered["Month"] == month_for_bar) & (df_filtered["Transaction"] == "Expense")]
-expenses_by_cat_month = df_month.groupby("Category")["Amount"].sum().reset_index().sort_values("Amount", ascending=False)
+df_month = df_expenses_no_savings[df_expenses_no_savings["Month"] == month_for_bar]
+if not df_month.empty:
+    expenses_by_cat_month = df_month.groupby("Category")["Amount"].sum().reset_index().sort_values("Amount", ascending=False)
+    fig_bar_month = px.bar(
+        expenses_by_cat_month,
+        x="Amount",
+        y="Category",
+        orientation="h",
+        title=f"Gastos por Categoria em {month_for_bar}",
+        text_auto=True
+    )
+    st.plotly_chart(fig_bar_month, use_container_width=True)
+else:
+    st.info(f"Não há despesas registradas para {month_for_bar}.")
 
-fig_bar_month = px.bar(
-    expenses_by_cat_month,
-    x="Amount",
-    y="Category",
-    orientation="h",
-    title=f"Gastos por Categoria em {month_for_bar}",
-    text_auto=True
-)
-st.plotly_chart(fig_bar_month, use_container_width=True)
 
-# 4) Receita vs Despesa (Pizza)
+# 5) Pizza - Receita vs Despesa (sem Savings)
 st.subheader("🥧 Receita vs Despesa")
 summary = {"Receita": total_income, "Despesa": total_expenses}
-fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()), title="Receita vs Despesa")
+fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()), title="Receita vs Despesa (Exclui Investimentos)")
 st.plotly_chart(fig_pie, use_container_width=True)
-# =====================
-# NOVO: Top 5 Categorias ao longo dos meses
-# =====================
-st.subheader("🔥 Top 5 Categorias de Gastos ao Longo dos Meses")
 
-# Considerar apenas despesas
-df_expenses = df_filtered[df_filtered["Transaction"] == "Expense"]
-
-# Descobrir as 5 maiores categorias no total do período filtrado
-top_categories = (
-    df_expenses.groupby("Category")["Amount"].sum()
-    .sort_values(ascending=False)
-    .head(5)
-    .index.tolist()
-)
-
-# Filtrar somente as top 5
-df_top5 = df_expenses[df_expenses["Category"].isin(top_categories)]
-
-# Agrupar por mês + categoria
-df_top5_summary = df_top5.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-
-# Criar gráfico de barras empilhadas
-fig_top5 = px.bar(
-    df_top5_summary,
-    x="Month",
-    y="Amount",
-    color="Category",
-    title="Top 5 Categorias de Gastos por Mês",
-    text_auto=True
-)
-st.plotly_chart(fig_top5, use_container_width=True)
+# 6) Evolução dos Investimentos
+st.subheader("📈 Evolução dos Investimentos")
+if not df_investments.empty:
+    investments_by_month = df_investments.groupby("Month")["Amount"].sum().reset_index()
+    fig_invest = px.line(investments_by_month, x="Month", y="Amount", title="Investimentos por Mês", markers=True)
+    st.plotly_chart(fig_invest, use_container_width=True)
+else:
+    st.info("Nenhum investimento registrado no período selecionado.")
 
 # =====================
 # TABELA FILTRADA
