@@ -16,7 +16,7 @@ def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
     excel_file = pd.ExcelFile(file_path)
 
     # Pegar apenas abas com padrão de mês (contendo "-")
-    month_sheets = [sheet for sheet in excel_file.sheet_names if "-" in sheet]
+    month_sheets = [sheet for sheet in excel_file.sheet_names if "_" in sheet]
 
     all_data = []
     for sheet in month_sheets:
@@ -182,5 +182,6 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
