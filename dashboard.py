@@ -12,8 +12,54 @@ def load_data():
     df["Month"] = df["Date"].dt.to_period("M").astype(str)  # Ex: 2025-01
     return df
 
-df = load_data()
+def load_data_consolidated(file_path="Monthly_Check_2025.xlsx"):
+    excel_file = pd.ExcelFile(file_path)
 
+    # Pegar apenas abas com padrão de mês (contendo "-")
+    month_sheets = [sheet for sheet in excel_file.sheet_names if "-" in sheet]
+
+    all_data = []
+    for sheet in month_sheets:
+        df_temp = pd.read_excel(file_path, sheet_name=sheet)
+        df_temp["SourceSheet"] = sheet
+        all_data.append(df_temp)
+
+    df = pd.concat(all_data, ignore_index=True)
+
+    # Padronizar colunas
+    df.columns = [col.strip().capitalize() for col in df.columns]
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Month"] = df["Date"].dt.to_period("M").astype(str)
+
+    # Se não existir coluna de parcelas, criar
+    if "Parcela" not in df.columns:
+        df["Installments"] = 1
+
+    return df
+
+def adjust_installment_dates(df):
+    # Garantir que existe coluna Parcelas
+    if "Parcela" not in df.columns:
+        return df
+
+    adjusted_rows = []
+    for _, row in df.iterrows():
+        parcelas = str(row.get("Parcelas", "1/1"))
+        try:
+            current, total = map(int, parcelas.split("/"))
+        except:
+            current, total = 1, 1
+
+        # Ajustar data para refletir a parcela correta
+        new_row = row.copy()
+        new_row["Date"] = row["Date"] + pd.DateOffset(months=(current - 1))
+        new_row["Month"] = new_row["Date"].to_period("M").astype(str)
+        adjusted_rows.append(new_row)
+
+    return pd.DataFrame(adjusted_rows)
+
+df_raw = load_data_consolidated()
+df = adjust_installment_dates(df_raw)
 # =====================
 # SIDEBAR - FILTROS GLOBAIS
 # =====================
@@ -136,3 +182,4 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
