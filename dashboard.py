@@ -13,27 +13,39 @@ def load_data():
     return df
 
 def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
-    excel_file = pd.ExcelFile(file_path)
+    try:
+        excel_file = pd.ExcelFile(file_path, engine="openpyxl")
+    except FileNotFoundError:
+        st.error("❌ Arquivo não encontrado. Certifique-se que o arquivo está no mesmo repositório.")
+        st.stop()
 
-    # Pegar apenas abas com padrão de mês (contendo "-")
-    month_sheets = [sheet for sheet in excel_file.sheet_names if "_" in sheet]
+    # Selecionar abas com padrão mês (01-2025 ou 01_2025)
+    month_sheets = [sheet for sheet in excel_file.sheet_names if re.match(r"^\d{2}[-_]\d{4}$", sheet)]
+
+    if not month_sheets:
+        st.error("❌ Nenhuma aba com formato válido encontrada. Esperado: 01-2025 ou 01_2025.")
+        st.stop()
 
     all_data = []
     for sheet in month_sheets:
-        df_temp = pd.read_excel(file_path, sheet_name=sheet,engine="openpyxl")
-        df_temp["SourceSheet"] = sheet
+        df_temp = pd.read_excel(file_path, sheet_name=sheet, engine="openpyxl")
+        if df_temp.empty:
+            continue  # Ignorar abas vazias
         all_data.append(df_temp)
 
+    if not all_data:
+        st.error("❌ Não foi possível carregar dados. As abas podem estar vazias ou com estrutura inválida.")
+        st.stop()
+
+    # Concatenar todas as abas
     df = pd.concat(all_data, ignore_index=True)
 
-    # Padronizar colunas
-    df.columns = [col.strip().capitalize() for col in df.columns]
-    df["Date"] = pd.to_datetime(df["Date"])
-    df["Month"] = df["Date"].dt.to_period("M").astype(str)
-
-    # Se não existir coluna de parcelas, criar
-    if "Parcela" not in df.columns:
-        df["Installments"] = 1
+    # Normalizar colunas se existirem
+    if hasattr(df, "columns"):
+        df.columns = [str(col).strip().capitalize() for col in df.columns]
+    else:
+        st.error("❌ Estrutura do arquivo inválida. Verifique se as abas possuem cabeçalhos.")
+        st.stop()
 
     return df
 
@@ -182,6 +194,7 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
