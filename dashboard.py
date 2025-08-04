@@ -29,7 +29,7 @@ def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
 
     all_data = []
     for sheet in month_sheets:
-        df_temp = pd.read_excel(file_path, sheet_name=sheet, engine="openpyxl")
+        df_temp = pd.read_excel(file_path, sheet_name=sheet, engine="openpyxl", header=3)
         if df_temp.empty:
             continue  # Ignorar abas vazias
         all_data.append(df_temp)
@@ -203,6 +203,7 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
