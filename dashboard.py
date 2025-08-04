@@ -22,6 +22,8 @@ def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
 
     # Selecionar abas com padrão mês (01-2025 ou 01_2025)
     month_sheets = [sheet for sheet in excel_file.sheet_names if re.match(r"^\d{2}[-_]\d{4}$", sheet)]
+    if "Gastos" in excel_file.sheet_names:
+        month_sheets.append("Gastos")
 
     if not month_sheets:
         st.error("❌ Nenhuma aba com formato válido encontrada. Esperado: 01-2025 ou 01_2025.")
@@ -203,6 +205,7 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
