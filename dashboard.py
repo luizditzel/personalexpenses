@@ -41,20 +41,23 @@ def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
     # Concatenar todas as abas
     df = pd.concat(all_data, ignore_index=True)
 
-    # Normalizar colunas se existirem
-    if hasattr(df, "columns"):
-        df.columns = [str(col).strip().capitalize() for col in df.columns]
-    else:
-        st.error("❌ Estrutura do arquivo inválida. Verifique se as abas possuem cabeçalhos.")
-        st.stop()
+    # Normalizar colunas
+    df.columns = [str(col).strip().capitalize() for col in df.columns]
+
+    # Verificar colunas essenciais
+    required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"❌ Coluna obrigatória não encontrada: {col}")
+            st.stop()
+
+    # Garantir coluna Parcelas
+    if "Parcelas" not in df.columns:
+        df["Parcelas"] = "1/1"
 
     return df
 
 def adjust_installment_dates(df):
-    # Garantir que existe coluna Parcelas
-    if "Parcela" not in df.columns:
-        return df
-
     adjusted_rows = []
     for _, row in df.iterrows():
         parcelas = str(row.get("Parcelas", "1/1"))
@@ -63,13 +66,18 @@ def adjust_installment_dates(df):
         except:
             current, total = 1, 1
 
-        # Ajustar data para refletir a parcela correta
         new_row = row.copy()
-        new_row["Date"] = row["Date"] + pd.DateOffset(months=(current - 1))
-        new_row["Month"] = new_row["Date"].to_period("M").astype(str)
+        # Ajustar data para a parcela correta
+        new_row["Date"] = pd.to_datetime(row["Date"], errors="coerce") + pd.DateOffset(months=(current - 1))
         adjusted_rows.append(new_row)
 
-    return pd.DataFrame(adjusted_rows)
+    adjusted_df = pd.DataFrame(adjusted_rows)
+
+    # Criar coluna Month
+    adjusted_df["Date"] = pd.to_datetime(adjusted_df["Date"], errors="coerce")
+    adjusted_df["Month"] = adjusted_df["Date"].dt.to_period("M").astype(str)
+
+    return adjusted_df
 
 df_raw = load_data_consolidated()
 df = adjust_installment_dates(df_raw)
@@ -195,6 +203,7 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
