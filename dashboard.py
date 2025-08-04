@@ -12,7 +12,7 @@ def load_data():
     df["Month"] = df["Date"].dt.to_period("M").astype(str)  # Ex: 2025-01
     return df
 
-def load_data_consolidated(file_path="Monthly_Check_2025.xlsx"):
+def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
     excel_file = pd.ExcelFile(file_path)
 
     # Pegar apenas abas com padrão de mês (contendo "-")
@@ -182,4 +182,5 @@ else:
 # =====================
 st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
