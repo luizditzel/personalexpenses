@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import re
+from google.oauth2.service_account import Credentials
 
 # ID da planilha Google Sheets
 SPREADSHEET_ID = "1D4xID5FDYYNvpctagqpfIDagt74CeU2K"
@@ -231,6 +232,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
