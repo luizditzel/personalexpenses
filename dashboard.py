@@ -142,20 +142,6 @@ def load_google_sheets_data(sheet_names):
 
     if "Parcela" not in df.columns:
         df["Parcela"] = "1/1"
-    if "Amount" in df.columns:
-        st.write("Tipo da coluna Amount:", df["Amount"].dtype)
-        st.write(df["Amount"].head())
-    if "Amount" in df.columns:
-        df["Amount"] = (
-            df["Amount"]
-            .astype(str)
-            .str.replace(".", "", regex=False)   # remove separador de milhar
-            .str.replace(",", ".", regex=False)  # converte vírgula decimal para ponto
-            .str.extract(r"([-+]?\d*\.?\d+)", expand=False)  # extrai o número (padrão seguro)
-        )
-        df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce").fillna(0)
-    else:
-        st.warning("⚠️ Coluna 'Amount' não encontrada.")
     df["Date"] = (
         df["Date"]
         .astype(str)
@@ -202,6 +188,18 @@ def adjust_installment_dates(df):
 st.title("📊 Dashboard Financeiro - Google Sheets")
 df_raw = load_gsheet_data(SHEET_NAMES)
 st.write("📋 Colunas após concatenação:", df_raw.columns.tolist())
+# Tratamento da coluna 'Amount'
+if "Amount" in df_raw.columns:
+    df_raw["Amount"] = (
+        df_raw["Amount"]
+        .astype(str)
+        .str.replace(".", "", regex=False)   # remove separador de milhar
+        .str.replace(",", ".", regex=False)  # converte vírgula decimal para ponto
+        .str.extract(r"([-+]?\d*\.?\d+)", expand=False)  # extrai o número (padrão seguro)
+    )
+    df_raw["Amount"] = pd.to_numeric(df_raw["Amount"], errors="coerce").fillna(0)
+else:
+    st.warning("⚠️ Coluna 'Amount' não encontrada.")
 df = adjust_installment_dates(df_raw)
 
 # Filtros
@@ -284,6 +282,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
