@@ -39,7 +39,7 @@ def load_google_sheets_data(sheet_names):
 
     if "Parcelas" not in df.columns:
         df["Parcelas"] = "1/1"
-
+    df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce").fillna(0)
     return df
 
 def adjust_installment_dates(df):
@@ -146,4 +146,5 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
