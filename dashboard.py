@@ -9,7 +9,7 @@ import gspread
 
 
 # ID da planilha Google Sheets
-SPREADSHEET_ID = "1D4xID5FDYYNvpctagqpfIDagt74CeU2K"
+SPREADSHEET_ID = "11sqIUL4ZxuXG36GtmE7wDY3yaj8Czm2ulj5evM4Z1dI"
 SHEET_GIDS = {
     "01_2025": "1806065603",
     "02_2025": "1340171258",
@@ -50,7 +50,7 @@ def load_gsheet_data(sheet_names):
     client = gspread.authorize(credentials)
 
     try:
-        spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
+        spreadsheet = client.open_by_key("11sqIUL4ZxuXG36GtmE7wDY3yaj8Czm2ulj5evM4Z1dI")
         st.success("✅ Planilha acessada com sucesso!")
         st.write("Abas disponíveis:", [ws.title for ws in spreadsheet.worksheets()])
     except Exception as e:
@@ -261,6 +261,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
