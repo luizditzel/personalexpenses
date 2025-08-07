@@ -2,323 +2,209 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import re
-from google.oauth2.service_account import Credentials
-from google.oauth2 import service_account
-import gspread
 
+# =====================
+# CARREGAR OS DADOS
+# =====================
+@st.cache_data
+def load_data():
+    df = pd.read_excel("Book1.xlsx")
+    df["Date"] = pd.to_datetime(df["Date"])
+    df["Month"] = df["Date"].dt.to_period("M").astype(str)  # Ex: 2025-01
+    return df
 
-
-# ID da planilha Google Sheets
-SPREADSHEET_ID = "11sqIUL4ZxuXG36GtmE7wDY3yaj8Czm2ulj5evM4Z1dI"
-SHEET_GIDS = {
-    "01_2025": "1806065603",
-    "02_2025": "1340171258",
-    "03_2025":"849306397",
-    "04_2025":"463664931", 
-    "05_2025":"1657948975",
-    "06_2025":"1788816244", 
-    "07_2025":"1652161617", 
-    "08_2025":"586436483",
-    "09_2025":"1656386015", 
-    "10_2025":"346639885",
-    "11_2025":"1015052667", 
-    "12_2025":"1501299313", 
-    "Gastos":"2131411121"
-}
-
-SHEET_NAMES = [
-    "01_2025", "02_2025", "03_2025", "04_2025", "05_2025",
-    "06_2025", "07_2025", "08_2025", "09_2025", "10_2025",
-    "11_2025", "12_2025", "Gastos"
-]
-import streamlit as st
-import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
-def make_unique(columns):
-    counts = {}
-    new_columns = []
-    for col in columns:
-        col = str(col).strip()
-        if col in counts:
-            counts[col] += 1
-            new_columns.append(f"{col}_{counts[col]}")
-        else:
-            counts[col] = 0
-            new_columns.append(col)
-    return new_columns
-@st.cache_data(show_spinner=False)
-def load_gsheet_data(sheet_names):
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets.readonly",
-        "https://www.googleapis.com/auth/drive.readonly"
-    ]
-    credentials = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
-    client = gspread.authorize(credentials)
-
+def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
     try:
-        spreadsheet = client.open_by_key("11sqIUL4ZxuXG36GtmE7wDY3yaj8Czm2ulj5evM4Z1dI")
-        st.success("📄 Planilha acessada com sucesso!")
-    except Exception as e:
-        st.error(f"❌ Falha ao acessar a planilha: {e}")
-        return pd.DataFrame()
-
-    all_data = []
-    for sheet_name in sheet_names:
-        try:
-            sheet = spreadsheet.worksheet(sheet_name)
-            # records = sheet.get_all_records()
-            # df = pd.DataFrame(records)
-            url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-            df = pd.read_csv(url, decimal=",")
-    
-            # Normalize os nomes das colunas
-            df.columns = make_unique([str(col).strip().capitalize() for col in df.columns])
-    
-            # Diagnóstico
-            st.write(f"✅ Aba '{sheet_name}' → colunas: {df.columns.tolist()}")
-    
-            df["source_sheet"] = sheet_name
-            all_data.append(df)
-        except Exception as e:
-            st.warning(f"⚠️ Falha ao carregar aba '{sheet_name}': {e}")
-        continue
-
-    st.write(f"🔍 Aba '{sheet_name}' colunas lidas: {df.columns.tolist()}")
-    if not all_data:
-        st.error("❌ Nenhuma aba foi carregada com sucesso.")
-        return pd.DataFrame()
-
-    df_final = pd.concat(all_data, ignore_index=True)
-    df["Amount"] = df["Amount"].astype(str).str.replace(",", ".", regex=False)
-    df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce")
-
-
-    # # Tratamento da coluna Amount
-    # if "Amount" in df_final.columns:
-    #     # df_final["Amount"] = (
-    #     #     df_final["Amount"]
-    #     #     .astype(str)
-    #     #    # .str.replace(".", "", regex=False)
-    #     #     .str.replace(",", ".", regex=False)
-    #     # )
-    #     df_final["Amount"] = pd.to_numeric(df_final["Amount"], errors="coerce").fillna(0.0)
-    # else:
-    #     st.error("❌ Coluna 'Amount' não encontrada após concatenação.")
-    #     st.stop()
-    
-    return df_final
-
-def load_google_sheets_data(sheet_names):
-    all_data = []
-    for sheet in sheet_names:
-        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet}"
-        try:
-            df = pd.read_csv(url, header=0, decimal=",")
-            df.columns = [str(c).strip().capitalize() for c in df.columns]
-
-            if not {"Title", "Amount", "Transaction", "Category", "Date"}.issubset(df.columns):
-                st.warning(f"❌ Colunas insuficientes na aba '{sheet}': {df.columns.tolist()}")
-            continue
-
-            df["source_sheet"] = sheet
-            all_data.append(df)
-            st.success(f"✅ Aba '{sheet}' lida com sucesso com {len(df)} linhas.")
-
-        except Exception as e:
-            st.error(f"❌ Erro ao carregar aba '{sheet}': {e}")
-    if not all_data:
-        st.error("Nenhum dado foi carregado das planilhas.")
+        excel_file = pd.ExcelFile(file_path, engine="openpyxl")
+    except FileNotFoundError:
+        st.error("❌ Arquivo não encontrado. Certifique-se que o arquivo está no mesmo repositório.")
         st.stop()
 
+    # Selecionar abas com padrão mês (01-2025 ou 01_2025)
+    month_sheets = [sheet for sheet in excel_file.sheet_names if re.match(r"^\d{2}[-_]\d{4}$", sheet)]
+    if "Gastos" in excel_file.sheet_names:
+        month_sheets.append("Gastos")
+
+    if not month_sheets:
+        st.error("❌ Nenhuma aba com formato válido encontrada. Esperado: 01-2025 ou 01_2025.")
+        st.stop()
+
+    all_data = []
+    for sheet in month_sheets:
+        df_temp = pd.read_excel(file_path, sheet_name=sheet, engine="openpyxl", header=3)
+        if df_temp.empty:
+            continue  # Ignorar abas vazias
+        all_data.append(df_temp)
+
+    if not all_data:
+        st.error("❌ Não foi possível carregar dados. As abas podem estar vazias ou com estrutura inválida.")
+        st.stop()
+
+    # Concatenar todas as abas
     df = pd.concat(all_data, ignore_index=True)
 
-    required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
-    expected_cols = ["Title", "Amount", "Transaction", "Category", "Date", "Parcela"]
-
-    df = pd.read_csv(url, header=0, decimal=",")
+    # Normalizar colunas
     df.columns = [str(col).strip().capitalize() for col in df.columns]
 
-    # Tentar rebatizar colunas perdidas
-    rename_map = {
-        "Unnamed: 1": "Amount",
-        "Unnamed: 5": "Date",
-        "Parcela": "Parcela"
-    }
-    df.rename(columns=rename_map, inplace=True)
+    # Verificar colunas essenciais
+    required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"❌ Coluna obrigatória não encontrada: {col}")
+            st.stop()
 
-    # Manter apenas as colunas relevantes
+    # Garantir coluna Parcelas
+    if "Parcelas" not in df.columns:
+        df["Parcelas"] = "1/1"
 
-    df = df[[col for col in df.columns if col in expected_cols or col == "source_sheet"]]
-    if set(expected_cols[:5]).issubset(df.columns):
-        df["source_sheet"] = sheet
-        all_data.append(df)
-    else:
-        st.warning(f"❌ Colunas incompletas em '{sheet}': {df.columns.tolist()}")
-
-    if "Parcela" not in df.columns:
-        df["Parcela"] = "1/1"
-    df["Date"] = (
-        df["Date"]
-        .astype(str)
-        .str.strip()
-        .str.replace("=", "", regex=False)
-        .str.replace('"', "", regex=False)
-    )
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=False)
     return df
 
 def adjust_installment_dates(df):
-    if "Date" not in df.columns:
-        st.error("❌ A coluna 'Date' não foi encontrada no DataFrame.")
-        st.stop()
     adjusted_rows = []
     for _, row in df.iterrows():
-        parcelas = str(row.get("Parcela", "1/1"))
+        parcelas = str(row.get("Parcelas", "1/1"))
         try:
             current, total = map(int, parcelas.split("/"))
         except:
             current, total = 1, 1
 
         new_row = row.copy()
-        try:
-            raw_date = str(row["Date"]).strip().replace("=", "").replace('"', "")
-            base_date = row["Date"]
-            if pd.isna(base_date):
-                continue  # ou trate como necessário
-
-
-            new_row["Date"] = base_date + pd.DateOffset(months=(current - 1))
-        except:
-            new_row["Date"] = pd.NaT
-
+        # Ajustar data para a parcela correta
+        new_row["Date"] = pd.to_datetime(row["Date"], errors="coerce") + pd.DateOffset(months=(current - 1))
         adjusted_rows.append(new_row)
 
     adjusted_df = pd.DataFrame(adjusted_rows)
+
+    # Criar coluna Month
     adjusted_df["Date"] = pd.to_datetime(adjusted_df["Date"], errors="coerce")
     adjusted_df["Month"] = adjusted_df["Date"].dt.to_period("M").astype(str)
 
     return adjusted_df
 
-# Carregar dados
-st.title("📊 Dashboard Financeiro - Google Sheets")
-df_raw = load_gsheet_data(SHEET_NAMES)
-st.write("📋 Colunas após concatenação:", df_raw.columns.tolist())
-
+df_raw = load_data_consolidated()
 df = adjust_installment_dates(df_raw)
-
-# Filtros
+# =====================
+# SIDEBAR - FILTROS GLOBAIS
+# =====================
 st.sidebar.header("Filtros")
-months = sorted(df["Month"].dropna().unique())
+months = sorted(df["Month"].unique())
 selected_months = st.sidebar.multiselect("Selecione os meses", months, default=months)
 
-categories = sorted(df["Category"].dropna().unique())
+categories = sorted(df["Category"].unique())
 selected_categories = st.sidebar.multiselect("Selecione categorias", categories, default=categories)
 
-transaction_types = sorted(df["Transaction"].dropna().unique())
+transaction_types = sorted(df["Transaction"].unique())
 selected_types = st.sidebar.multiselect("Selecione tipo", transaction_types, default=transaction_types)
 
-# Aplicar filtros
+# Aplicar filtros globais
 df_filtered = df[
     (df["Month"].isin(selected_months)) &
     (df["Category"].isin(selected_categories)) &
     (df["Transaction"].isin(selected_types))
 ]
-
-# KPIs
+# Separar Savings das outras despesas
 df_investments = df_filtered[(df_filtered["Transaction"] == "Expense") & (df_filtered["Category"] == "Savings")]
 df_expenses_no_savings = df_filtered[(df_filtered["Transaction"] == "Expense") & (df_filtered["Category"] != "Savings")]
 
+# KPIs ajustados
 total_expenses = df_expenses_no_savings["Amount"].sum()
 total_income = df_filtered[df_filtered["Transaction"] == "Income"]["Amount"].sum()
 total_investments = df_investments["Amount"].sum()
 balance = total_income - (total_expenses + total_investments)
 
+
+st.title("📊 Dashboard Financeiro")
+st.markdown("Visualização interativa de receitas e despesas")
+
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Despesas", f"R$ {total_expenses:,.2f}")
-col2.metric("Receitas", f"R$ {total_income:,.2f}")
+col1.metric("Total Despesas", f"R$ {total_expenses:,.2f}")
+col2.metric("Total Receitas", f"R$ {total_income:,.2f}")
 col3.metric("Investimentos", f"R$ {total_investments:,.2f}")
 col4.metric("Saldo", f"R$ {balance:,.2f}")
 
-# Gráfico Receita vs Despesa
-st.subheader("📈 Receita vs Despesa")
-if not df_filtered.empty:
-    monthly_summary = df_filtered.groupby(["Month", "Transaction"])["Amount"].sum().reset_index()
-    fig_line = px.line(monthly_summary, x="Month", y="Amount", color="Transaction", markers=True)
-    st.plotly_chart(fig_line, use_container_width=True)
+# =====================
+# GRÁFICOS
+# =====================
 
-# Evolução por categoria
+# 1) Evolução mensal Receita vs Despesa
+st.subheader("📈 Evolução Mensal (Receita vs Despesa)")
+monthly_summary = df_filtered.groupby(["Month", "Transaction"])["Amount"].sum().reset_index()
+fig_line = px.line(monthly_summary, x="Month", y="Amount", color="Transaction",
+                   title="Receita e Despesa por Mês", markers=True)
+st.plotly_chart(fig_line, use_container_width=True)
+
+# 2) Evolução das Despesas por Categoria
 st.subheader("📊 Evolução das Despesas por Categoria")
 if not df_expenses_no_savings.empty:
     evolution_by_cat = df_expenses_no_savings.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-    fig_cat = px.line(evolution_by_cat, x="Month", y="Amount", color="Category", markers=True)
-    st.plotly_chart(fig_cat, use_container_width=True)
-
-# Top 5 Categorias
-st.subheader("Top 5 Categorias de Gastos")
+    fig_cat_evolution = px.line(evolution_by_cat, x="Month", y="Amount", color="Category",
+                                 title="Evolução das Despesas por Categoria", markers=True)
+    st.plotly_chart(fig_cat_evolution, use_container_width=True)
+else:
+    st.info("Nenhuma despesa encontrada no período selecionado.")
+    
+# 3) Top 5 Categorias ao longo dos meses
+st.subheader("🔥 Top 5 Categorias de Gastos ao Longo dos Meses")
 if not df_expenses_no_savings.empty:
-    top_cats = df_expenses_no_savings.groupby("Category")["Amount"].sum().nlargest(5).index.tolist()
-    df_top5 = df_expenses_no_savings[df_expenses_no_savings["Category"].isin(top_cats)]
+    top_categories = (
+        df_expenses_no_savings.groupby("Category")["Amount"].sum()
+        .sort_values(ascending=False)
+        .head(5)
+        .index.tolist()
+    )
+    df_top5 = df_expenses_no_savings[df_expenses_no_savings["Category"].isin(top_categories)]
     df_top5_summary = df_top5.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-    fig_top5 = px.bar(df_top5_summary, x="Month", y="Amount", color="Category", text_auto=True)
+    fig_top5 = px.bar(
+        df_top5_summary,
+        x="Month",
+        y="Amount",
+        color="Category",
+        title="Top 5 Categorias de Gastos por Mês",
+        text_auto=True
+    )
     st.plotly_chart(fig_top5, use_container_width=True)
+else:
+    st.info("Não há despesas para calcular as Top 5 categorias.")
 
-# Pizza Receita vs Despesa
+# 4) Gastos por Categoria (Selecionar Mês)
+st.subheader("📊 Gastos por Categoria (Selecionar Mês)")
+month_for_bar = st.selectbox("Selecione um mês para analisar categorias", months)
+df_month = df_expenses_no_savings[df_expenses_no_savings["Month"] == month_for_bar]
+if not df_month.empty:
+    expenses_by_cat_month = df_month.groupby("Category")["Amount"].sum().reset_index().sort_values("Amount", ascending=False)
+    fig_bar_month = px.bar(
+        expenses_by_cat_month,
+        x="Amount",
+        y="Category",
+        orientation="h",
+        title=f"Gastos por Categoria em {month_for_bar}",
+        text_auto=True
+    )
+    st.plotly_chart(fig_bar_month, use_container_width=True)
+else:
+    st.info(f"Não há despesas registradas para {month_for_bar}.")
+
+
+# 5) Pizza - Receita vs Despesa (sem Savings)
 st.subheader("🥧 Receita vs Despesa")
 summary = {"Receita": total_income, "Despesa": total_expenses}
-fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()))
+fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()), title="Receita vs Despesa (Exclui Investimentos)")
 st.plotly_chart(fig_pie, use_container_width=True)
 
-# Investimentos
-st.subheader("📈 Investimentos")
+# 6) Evolução dos Investimentos
+st.subheader("📈 Evolução dos Investimentos")
 if not df_investments.empty:
-    invest_month = df_investments.groupby("Month")["Amount"].sum().reset_index()
-    fig_invest = px.line(invest_month, x="Month", y="Amount", markers=True)
+    investments_by_month = df_investments.groupby("Month")["Amount"].sum().reset_index()
+    fig_invest = px.line(investments_by_month, x="Month", y="Amount", title="Investimentos por Mês", markers=True)
     st.plotly_chart(fig_invest, use_container_width=True)
+else:
+    st.info("Nenhum investimento registrado no período selecionado.")
 
-# Download CSV
-st.download_button(
-    "📅 Baixar dados filtrados (CSV)",
-    df_filtered.to_csv(index=False).encode("utf-8"),
-    "dados_filtrados.csv",
-    "text/csv",
-)
-
-# Tabela final
-st.subheader("📄 Detalhes das Transações")
+# =====================
+# TABELA FILTRADA
+# =====================
+st.subheader("📄 Detalhes das Transações Filtradas")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
