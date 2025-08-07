@@ -17,7 +17,7 @@ def load_google_sheets_data(sheet_names):
     for sheet in sheet_names:
         url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet}"
         try:
-            df = pd.read_csv(url, header=3)
+            df = pd.read_csv(url, header=0)
             df.columns = [str(col).strip().capitalize() for col in df.columns]
             df["source_sheet"] = sheet
             all_data.append(df)
@@ -146,3 +146,4 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
