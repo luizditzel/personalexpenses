@@ -19,6 +19,7 @@ def load_google_sheets_data(sheet_names):
         try:
             df = pd.read_csv(url, header=0, decimal=",")
             df.columns = [str(col).strip().capitalize() for col in df.columns]
+            st.write(f"Aba: {sheet} → colunas:", df.columns.tolist())  # Diagnóstico
             df["source_sheet"] = sheet
             all_data.append(df)
         except Exception as e:
@@ -32,8 +33,6 @@ def load_google_sheets_data(sheet_names):
     df = pd.concat(all_data, ignore_index=True)
 
     required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
-    expected_cols = ["Title", "Amount", "Transaction", "Category", "Date", "Parcelas"]
-    df = df[[col for col in df.columns if col in expected_cols or col == "source_sheet"]]
     for col in required_cols:
         if col not in df.columns:
             st.error(f"Coluna obrigatória ausente: {col}")
@@ -41,7 +40,25 @@ def load_google_sheets_data(sheet_names):
 
     if "Parcelas" not in df.columns:
         df["Parcelas"] = "1/1"
+
+    # Limpeza de valores numéricos e datas
+    df["Amount"] = (
+        df["Amount"]
+        .astype(str)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+    )
     df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce").fillna(0)
+
+    df["Date"] = (
+        df["Date"]
+        .astype(str)
+        .str.strip()
+        .str.replace("=", "", regex=False)
+        .str.replace('"', "", regex=False)
+    )
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
     return df
 
 def adjust_installment_dates(df):
@@ -53,22 +70,15 @@ def adjust_installment_dates(df):
         except:
             current, total = 1, 1
 
+        base_date = row["Date"]
+        if pd.isna(base_date):
+            continue
+
         new_row = row.copy()
-        try:
-            raw_date = str(row["Date"]).strip().replace("=", "").replace('"', "")
-            base_date = row["Date"]
-            if pd.isna(base_date):
-                continue  # ou trate como necessário
-
-
-            new_row["Date"] = base_date + pd.DateOffset(months=(current - 1))
-        except:
-            new_row["Date"] = pd.NaT
-
+        new_row["Date"] = base_date + pd.DateOffset(months=(current - 1))
         adjusted_rows.append(new_row)
 
     adjusted_df = pd.DataFrame(adjusted_rows)
-    adjusted_df["Date"] = pd.to_datetime(adjusted_df["Date"], errors="coerce")
     adjusted_df["Month"] = adjusted_df["Date"].dt.to_period("M").astype(str)
 
     return adjusted_df
@@ -158,9 +168,3 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
-
-
-
-
-
-
