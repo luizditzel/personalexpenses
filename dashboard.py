@@ -152,6 +152,7 @@ def load_google_sheets_data(sheet_names):
         .str.replace(".", "", regex=False)  # remove separador de milhar
         .str.replace(",", ".", regex=False)  # troca separador decimal
         .str.strip()
+        .replace("", "0")
         .astype(float)                    # converte pra número
         )
     df["Date"] = (
@@ -282,6 +283,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
