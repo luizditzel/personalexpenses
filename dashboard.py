@@ -56,9 +56,11 @@ def adjust_installment_dates(df):
         new_row = row.copy()
         try:
             raw_date = str(row["Date"]).strip().replace("=", "").replace('"', "")
-            base_date = pd.to_datetime(raw_date, dayfirst=False, errors="coerce")
+            base_date = row["Date"]
             if pd.isna(base_date):
-                raise ValueError
+                continue  # ou trate como necessário
+
+
             new_row["Date"] = base_date + pd.DateOffset(months=(current - 1))
         except:
             new_row["Date"] = pd.NaT
@@ -156,6 +158,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
