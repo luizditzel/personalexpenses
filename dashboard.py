@@ -53,7 +53,7 @@ def load_google_sheets_data(sheet_names):
     df = pd.concat(all_data, ignore_index=True)
 
     required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
-    expected_cols = ["Title", "Amount", "Transaction", "Category", "Date", "Parcelas"]
+    expected_cols = ["Title", "Amount", "Transaction", "Category", "Date", "Parcela"]
 
     df = pd.read_csv(url, header=0, decimal=",")
     df.columns = [str(col).strip().capitalize() for col in df.columns]
@@ -62,7 +62,7 @@ def load_google_sheets_data(sheet_names):
     rename_map = {
         "Unnamed: 1": "Amount",
         "Unnamed: 5": "Date",
-        "Parcela": "Parcelas"
+        "Parcela": "Parcela"
     }
     df.rename(columns=rename_map, inplace=True)
 
@@ -75,8 +75,8 @@ def load_google_sheets_data(sheet_names):
     else:
         st.warning(f"❌ Colunas incompletas em '{sheet}': {df.columns.tolist()}")
 
-    if "Parcelas" not in df.columns:
-        df["Parcelas"] = "1/1"
+    if "Parcela" not in df.columns:
+        df["Parcela"] = "1/1"
     df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce").fillna(0)
     df["Date"] = (
         df["Date"]
@@ -91,7 +91,7 @@ def load_google_sheets_data(sheet_names):
 def adjust_installment_dates(df):
     adjusted_rows = []
     for _, row in df.iterrows():
-        parcelas = str(row.get("Parcelas", "1/1"))
+        parcelas = str(row.get("Parcela", "1/1"))
         try:
             current, total = map(int, parcelas.split("/"))
         except:
@@ -202,6 +202,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
