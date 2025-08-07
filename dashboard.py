@@ -32,16 +32,20 @@ def load_google_sheets_data(sheet_names):
     all_data = []
     for sheet in sheet_names:
         url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet}"
-
         try:
             df = pd.read_csv(url, header=0, decimal=",")
-            df.columns = [str(col).strip().capitalize() for col in df.columns]
-            df["source_sheet"] = sheet
-            all_data.append(df)
-        except Exception as e:
-            st.warning(f"Erro ao carregar aba '{sheet}': {e}")
+            df.columns = [str(c).strip().capitalize() for c in df.columns]
+
+            if not {"Title", "Amount", "Transaction", "Category", "Date"}.issubset(df.columns):
+                st.warning(f"❌ Colunas insuficientes na aba '{sheet}': {df.columns.tolist()}")
             continue
 
+        df["source_sheet"] = sheet
+        all_data.append(df)
+        st.success(f"✅ Aba '{sheet}' lida com sucesso com {len(df)} linhas.")
+
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar aba '{sheet}': {e}")
     if not all_data:
         st.error("Nenhum dado foi carregado das planilhas.")
         st.stop()
@@ -198,6 +202,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
