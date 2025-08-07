@@ -32,6 +32,8 @@ def load_google_sheets_data(sheet_names):
     df = pd.concat(all_data, ignore_index=True)
 
     required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
+    expected_cols = ["Title", "Amount", "Transaction", "Category", "Date", "Parcelas"]
+    df = df[[col for col in df.columns if col in expected_cols or col == "source_sheet"]]
     for col in required_cols:
         if col not in df.columns:
             st.error(f"Coluna obrigatória ausente: {col}")
@@ -146,6 +148,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
