@@ -70,8 +70,10 @@ def load_gsheet_data(sheet_names):
     for sheet_name in sheet_names:
         try:
             sheet = spreadsheet.worksheet(sheet_name)
-            records = sheet.get_all_records()
-            df = pd.DataFrame(records)
+            # records = sheet.get_all_records()
+            # df = pd.DataFrame(records)
+            url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+            df = pd.read_csv(url, decimal=",")
     
             # Normalize os nomes das colunas
             df.columns = make_unique([str(col).strip().capitalize() for col in df.columns])
@@ -288,6 +290,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
