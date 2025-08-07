@@ -57,7 +57,7 @@ def load_gsheet_data(sheet_names):
         st.error(f"❌ Falha ao acessar a planilha: {e}")
         st.stop()
     # Abrir planilha
-    spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
+    #spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
     all_data = []
 
     for sheet_name in sheet_names:
@@ -261,6 +261,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
