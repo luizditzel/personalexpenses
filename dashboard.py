@@ -34,29 +34,44 @@ from google.oauth2.service_account import Credentials
 
 @st.cache_data(show_spinner=False)
 def load_gsheet_data(sheet_names):
+    # Autenticar
     scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    
-    # Lê o segredo salvo no secrets.toml do Streamlit Cloud
     credentials = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
         scopes=scopes
     )
-
     client = gspread.authorize(credentials)
-    spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
 
+    # Abrir planilha
+    spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
     all_data = []
+
     for sheet_name in sheet_names:
         try:
             worksheet = spreadsheet.worksheet(sheet_name)
-            data = worksheet.get_all_records()
+            data = worksheet.get_all_values()
             df = pd.DataFrame(data)
+
+            # Pular linhas em branco antes do header (detecta dinamicamente a linha com os nomes)
+            header_row_idx = df[df.iloc[:, 0] == "Title"].index
+            if header_row_idx.empty:
+                st.warning(f"❌ Header não encontrado na aba '{sheet_name}'")
+                continue
+            header_idx = header_row_idx[0]
+            df.columns = df.iloc[header_idx]
+            df = df.iloc[header_idx + 1:]
+
             df["source_sheet"] = sheet_name
             all_data.append(df)
         except Exception as e:
-            st.warning(f"Erro ao ler aba {sheet_name}: {e}")
+            st.warning(f"Erro ao ler aba '{sheet_name}': {e}")
 
-    return pd.concat(all_data, ignore_index=True)
+    if not all_data:
+        st.error("❌ Nenhuma aba foi carregada com sucesso.")
+        st.stop()
+
+    df = pd.concat(all_data, ignore_index=True)
+    return df
 
 def load_google_sheets_data(sheet_names):
     all_data = []
@@ -232,6 +247,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
