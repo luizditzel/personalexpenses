@@ -53,6 +53,7 @@ def load_gsheet_data(sheet_names):
         spreadsheet = client.open_by_key("11sqIUL4ZxuXG36GtmE7wDY3yaj8Czm2ulj5evM4Z1dI")
         st.success("✅ Planilha acessada com sucesso!")
         st.write("Abas disponíveis:", [ws.title for ws in spreadsheet.worksheets()])
+        st.write(f"✅ Aba carregada: {sheet_name} → colunas: {df.columns.tolist()}")
     except Exception as e:
         st.error(f"❌ Falha ao acessar a planilha: {e}")
         st.stop()
@@ -261,6 +262,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
