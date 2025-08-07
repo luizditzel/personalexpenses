@@ -74,7 +74,7 @@ def load_gsheet_data(sheet_names):
             st.warning(f"⚠️ Falha ao carregar aba '{sheet_name}': {e}")
         continue
 
-  
+    st.write(f"🔍 Aba '{sheet_name}' colunas lidas: {df.columns.tolist()}")
     if not all_data:
         st.error("❌ Nenhuma aba foi carregada com sucesso.")
         return pd.DataFrame()
@@ -143,6 +143,9 @@ def load_google_sheets_data(sheet_names):
     return df
 
 def adjust_installment_dates(df):
+    if "Date" not in df.columns:
+        st.error("❌ A coluna 'Date' não foi encontrada no DataFrame.")
+        st.stop()
     adjusted_rows = []
     for _, row in df.iterrows():
         parcelas = str(row.get("Parcela", "1/1"))
@@ -174,6 +177,7 @@ def adjust_installment_dates(df):
 # Carregar dados
 st.title("📊 Dashboard Financeiro - Google Sheets")
 df_raw = load_gsheet_data(SHEET_NAMES)
+st.write("📋 Colunas após concatenação:", df_raw.columns.tolist())
 df = adjust_installment_dates(df_raw)
 
 # Filtros
@@ -256,6 +260,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
