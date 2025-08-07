@@ -56,22 +56,25 @@ def load_gsheet_data(sheet_names):
         return pd.DataFrame()
 
     all_data = []
-
     for sheet_name in sheet_names:
         try:
             sheet = spreadsheet.worksheet(sheet_name)
             records = sheet.get_all_records()
             df = pd.DataFrame(records)
-            df.columns = make_unique(df.columns)
-
-            st.write(f"✅ Aba '{sheet_name}' carregada com colunas: {df.columns.tolist()}")
-
+    
+            # Normalize os nomes das colunas
+            df.columns = make_unique([str(col).strip().capitalize() for col in df.columns])
+    
+            # Diagnóstico
+            st.write(f"✅ Aba '{sheet_name}' → colunas: {df.columns.tolist()}")
+    
             df["source_sheet"] = sheet_name
             all_data.append(df)
         except Exception as e:
             st.warning(f"⚠️ Falha ao carregar aba '{sheet_name}': {e}")
-            continue
+        continue
 
+  
     if not all_data:
         st.error("❌ Nenhuma aba foi carregada com sucesso.")
         return pd.DataFrame()
@@ -253,6 +256,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
