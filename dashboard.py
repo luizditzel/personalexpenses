@@ -3,57 +3,40 @@ import pandas as pd
 import plotly.express as px
 import re
 
-# =====================
-# CARREGAR OS DADOS
-# =====================
-@st.cache_data
-def load_data():
-    df = pd.read_excel("Book1.xlsx")
-    df["Date"] = pd.to_datetime(df["Date"])
-    df["Month"] = df["Date"].dt.to_period("M").astype(str)  # Ex: 2025-01
-    return df
+# ID da planilha Google Sheets
+SPREADSHEET_ID = "1D4xID5FDYYNvpctagqpfIDagt74CeU2K"
+SHEET_NAMES = [
+    "01_2025", "02_2025", "03_2025", "04_2025", "05_2025",
+    "06_2025", "07_2025", "08_2025", "09_2025", "10_2025",
+    "11_2025", "12_2025", "Gastos"
+]
 
-def load_data_consolidated(file_path="Monthly_Check_2025.xlsm"):
-    try:
-        excel_file = pd.ExcelFile(file_path, engine="openpyxl")
-    except FileNotFoundError:
-        st.error("❌ Arquivo não encontrado. Certifique-se que o arquivo está no mesmo repositório.")
-        st.stop()
-
-    # Selecionar abas com padrão mês (01-2025 ou 01_2025)
-    month_sheets = [sheet for sheet in excel_file.sheet_names if re.match(r"^\d{2}[-_]\d{4}$", sheet)]
-    if "Gastos" in excel_file.sheet_names:
-        month_sheets.append("Gastos")
-
-    if not month_sheets:
-        st.error("❌ Nenhuma aba com formato válido encontrada. Esperado: 01-2025 ou 01_2025.")
-        st.stop()
-
+@st.cache_data(show_spinner=False)
+def load_google_sheets_data(sheet_names):
     all_data = []
-    for sheet in month_sheets:
-        df_temp = pd.read_excel(file_path, sheet_name=sheet, engine="openpyxl", header=3)
-        if df_temp.empty:
-            continue  # Ignorar abas vazias
-        all_data.append(df_temp)
+    for sheet in sheet_names:
+        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet}"
+        try:
+            df = pd.read_csv(url, header=3)
+            df.columns = [str(col).strip().capitalize() for col in df.columns]
+            df["source_sheet"] = sheet
+            all_data.append(df)
+        except Exception as e:
+            st.warning(f"Erro ao carregar aba '{sheet}': {e}")
+            continue
 
     if not all_data:
-        st.error("❌ Não foi possível carregar dados. As abas podem estar vazias ou com estrutura inválida.")
+        st.error("Nenhum dado foi carregado das planilhas.")
         st.stop()
 
-    # Concatenar todas as abas
     df = pd.concat(all_data, ignore_index=True)
 
-    # Normalizar colunas
-    df.columns = [str(col).strip().capitalize() for col in df.columns]
-
-    # Verificar colunas essenciais
     required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
     for col in required_cols:
         if col not in df.columns:
-            st.error(f"❌ Coluna obrigatória não encontrada: {col}")
+            st.error(f"Coluna obrigatória ausente: {col}")
             st.stop()
 
-    # Garantir coluna Parcelas
     if "Parcelas" not in df.columns:
         df["Parcelas"] = "1/1"
 
@@ -69,148 +52,97 @@ def adjust_installment_dates(df):
             current, total = 1, 1
 
         new_row = row.copy()
-        # Ajustar data para a parcela correta
         new_row["Date"] = pd.to_datetime(row["Date"], errors="coerce") + pd.DateOffset(months=(current - 1))
         adjusted_rows.append(new_row)
 
     adjusted_df = pd.DataFrame(adjusted_rows)
-
-    # Criar coluna Month
     adjusted_df["Date"] = pd.to_datetime(adjusted_df["Date"], errors="coerce")
     adjusted_df["Month"] = adjusted_df["Date"].dt.to_period("M").astype(str)
 
     return adjusted_df
 
-df_raw = load_data_consolidated()
+# Carregar dados
+st.title("📊 Dashboard Financeiro - Google Sheets")
+df_raw = load_google_sheets_data(SHEET_NAMES)
 df = adjust_installment_dates(df_raw)
-# =====================
-# SIDEBAR - FILTROS GLOBAIS
-# =====================
+
+# Filtros
 st.sidebar.header("Filtros")
-months = sorted(df["Month"].unique())
+months = sorted(df["Month"].dropna().unique())
 selected_months = st.sidebar.multiselect("Selecione os meses", months, default=months)
 
-categories = sorted(df["Category"].unique())
+categories = sorted(df["Category"].dropna().unique())
 selected_categories = st.sidebar.multiselect("Selecione categorias", categories, default=categories)
 
-transaction_types = sorted(df["Transaction"].unique())
+transaction_types = sorted(df["Transaction"].dropna().unique())
 selected_types = st.sidebar.multiselect("Selecione tipo", transaction_types, default=transaction_types)
 
-# Aplicar filtros globais
+# Aplicar filtros
 df_filtered = df[
     (df["Month"].isin(selected_months)) &
     (df["Category"].isin(selected_categories)) &
     (df["Transaction"].isin(selected_types))
 ]
-# Separar Savings das outras despesas
+
+# KPIs
 df_investments = df_filtered[(df_filtered["Transaction"] == "Expense") & (df_filtered["Category"] == "Savings")]
 df_expenses_no_savings = df_filtered[(df_filtered["Transaction"] == "Expense") & (df_filtered["Category"] != "Savings")]
 
-# KPIs ajustados
 total_expenses = df_expenses_no_savings["Amount"].sum()
 total_income = df_filtered[df_filtered["Transaction"] == "Income"]["Amount"].sum()
 total_investments = df_investments["Amount"].sum()
 balance = total_income - (total_expenses + total_investments)
 
-
-st.title("📊 Dashboard Financeiro")
-st.markdown("Visualização interativa de receitas e despesas")
-
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Despesas", f"R$ {total_expenses:,.2f}")
-col2.metric("Total Receitas", f"R$ {total_income:,.2f}")
+col1.metric("Despesas", f"R$ {total_expenses:,.2f}")
+col2.metric("Receitas", f"R$ {total_income:,.2f}")
 col3.metric("Investimentos", f"R$ {total_investments:,.2f}")
 col4.metric("Saldo", f"R$ {balance:,.2f}")
 
-# =====================
-# GRÁFICOS
-# =====================
+# Gráfico Receita vs Despesa
+st.subheader("📈 Receita vs Despesa")
+if not df_filtered.empty:
+    monthly_summary = df_filtered.groupby(["Month", "Transaction"])["Amount"].sum().reset_index()
+    fig_line = px.line(monthly_summary, x="Month", y="Amount", color="Transaction", markers=True)
+    st.plotly_chart(fig_line, use_container_width=True)
 
-# 1) Evolução mensal Receita vs Despesa
-st.subheader("📈 Evolução Mensal (Receita vs Despesa)")
-monthly_summary = df_filtered.groupby(["Month", "Transaction"])["Amount"].sum().reset_index()
-fig_line = px.line(monthly_summary, x="Month", y="Amount", color="Transaction",
-                   title="Receita e Despesa por Mês", markers=True)
-st.plotly_chart(fig_line, use_container_width=True)
-
-# 2) Evolução das Despesas por Categoria
+# Evolução por categoria
 st.subheader("📊 Evolução das Despesas por Categoria")
 if not df_expenses_no_savings.empty:
     evolution_by_cat = df_expenses_no_savings.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-    fig_cat_evolution = px.line(evolution_by_cat, x="Month", y="Amount", color="Category",
-                                 title="Evolução das Despesas por Categoria", markers=True)
-    st.plotly_chart(fig_cat_evolution, use_container_width=True)
-else:
-    st.info("Nenhuma despesa encontrada no período selecionado.")
-    
-# 3) Top 5 Categorias ao longo dos meses
-st.subheader("🔥 Top 5 Categorias de Gastos ao Longo dos Meses")
+    fig_cat = px.line(evolution_by_cat, x="Month", y="Amount", color="Category", markers=True)
+    st.plotly_chart(fig_cat, use_container_width=True)
+
+# Top 5 Categorias
+st.subheader("Top 5 Categorias de Gastos")
 if not df_expenses_no_savings.empty:
-    top_categories = (
-        df_expenses_no_savings.groupby("Category")["Amount"].sum()
-        .sort_values(ascending=False)
-        .head(5)
-        .index.tolist()
-    )
-    df_top5 = df_expenses_no_savings[df_expenses_no_savings["Category"].isin(top_categories)]
+    top_cats = df_expenses_no_savings.groupby("Category")["Amount"].sum().nlargest(5).index.tolist()
+    df_top5 = df_expenses_no_savings[df_expenses_no_savings["Category"].isin(top_cats)]
     df_top5_summary = df_top5.groupby(["Month", "Category"])["Amount"].sum().reset_index()
-    fig_top5 = px.bar(
-        df_top5_summary,
-        x="Month",
-        y="Amount",
-        color="Category",
-        title="Top 5 Categorias de Gastos por Mês",
-        text_auto=True
-    )
+    fig_top5 = px.bar(df_top5_summary, x="Month", y="Amount", color="Category", text_auto=True)
     st.plotly_chart(fig_top5, use_container_width=True)
-else:
-    st.info("Não há despesas para calcular as Top 5 categorias.")
 
-# 4) Gastos por Categoria (Selecionar Mês)
-st.subheader("📊 Gastos por Categoria (Selecionar Mês)")
-month_for_bar = st.selectbox("Selecione um mês para analisar categorias", months)
-df_month = df_expenses_no_savings[df_expenses_no_savings["Month"] == month_for_bar]
-if not df_month.empty:
-    expenses_by_cat_month = df_month.groupby("Category")["Amount"].sum().reset_index().sort_values("Amount", ascending=False)
-    fig_bar_month = px.bar(
-        expenses_by_cat_month,
-        x="Amount",
-        y="Category",
-        orientation="h",
-        title=f"Gastos por Categoria em {month_for_bar}",
-        text_auto=True
-    )
-    st.plotly_chart(fig_bar_month, use_container_width=True)
-else:
-    st.info(f"Não há despesas registradas para {month_for_bar}.")
-
-
-# 5) Pizza - Receita vs Despesa (sem Savings)
+# Pizza Receita vs Despesa
 st.subheader("🥧 Receita vs Despesa")
 summary = {"Receita": total_income, "Despesa": total_expenses}
-fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()), title="Receita vs Despesa (Exclui Investimentos)")
+fig_pie = px.pie(names=list(summary.keys()), values=list(summary.values()))
 st.plotly_chart(fig_pie, use_container_width=True)
 
-# 6) Evolução dos Investimentos
-st.subheader("📈 Evolução dos Investimentos")
+# Investimentos
+st.subheader("📈 Investimentos")
 if not df_investments.empty:
-    investments_by_month = df_investments.groupby("Month")["Amount"].sum().reset_index()
-    fig_invest = px.line(investments_by_month, x="Month", y="Amount", title="Investimentos por Mês", markers=True)
+    invest_month = df_investments.groupby("Month")["Amount"].sum().reset_index()
+    fig_invest = px.line(invest_month, x="Month", y="Amount", markers=True)
     st.plotly_chart(fig_invest, use_container_width=True)
-else:
-    st.info("Nenhum investimento registrado no período selecionado.")
 
-# =====================
-# TABELA FILTRADA
-# =====================
-st.subheader("📄 Detalhes das Transações Filtradas")
+# Download CSV
+st.download_button(
+    "📅 Baixar dados filtrados (CSV)",
+    df_filtered.to_csv(index=False).encode("utf-8"),
+    "dados_filtrados.csv",
+    "text/csv",
+)
+
+# Tabela final
+st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
-
-
-
-
-
-
-
-
-
