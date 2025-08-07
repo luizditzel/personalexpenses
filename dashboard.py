@@ -145,16 +145,17 @@ def load_google_sheets_data(sheet_names):
     if "Amount" in df.columns:
         st.write("Tipo da coluna Amount:", df["Amount"].dtype)
         st.write(df["Amount"].head())
-    df["Amount"] = (
-        df["Amount"]
-        .astype(str)                      # garante string
-        .str.replace("R$", "", regex=False)
-        .str.replace(".", "", regex=False)  # remove separador de milhar
-        .str.replace(",", ".", regex=False)  # troca separador decimal
-        .str.strip()
-        .replace("", "0")
-        .astype(float)                    # converte pra número
+    if "Amount" in df.columns:
+        df["Amount"] = (
+            df["Amount"]
+            .astype(str)
+            .str.replace(".", "", regex=False)   # remove separador de milhar
+            .str.replace(",", ".", regex=False)  # converte vírgula decimal para ponto
+            .str.extract(r"([-+]?\d*\.?\d+)", expand=False)  # extrai o número (padrão seguro)
         )
+        df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce").fillna(0)
+    else:
+        st.warning("⚠️ Coluna 'Amount' não encontrada.")
     df["Date"] = (
         df["Date"]
         .astype(str)
@@ -283,6 +284,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
