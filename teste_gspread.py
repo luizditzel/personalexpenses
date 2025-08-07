@@ -1,27 +1,29 @@
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
-st.title("🔐 Teste de Acesso ao Google Sheets")
-
-scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-
-# Autenticação via secrets.toml
+# Autenticação
 try:
-    credentials = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"], scopes=scopes
+    credentials = service_account.Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=["https://www.googleapis.com/auth/drive.metadata.readonly"]
     )
-    client = gspread.authorize(credentials)
-    st.success("✅ Autenticação bem-sucedida com a conta de serviço.")
+    st.success("✅ Autenticação com sucesso")
 except Exception as e:
-    st.error(f"❌ Falha na autenticação: {e}")
+    st.error(f"❌ Erro na autenticação: {e}")
     st.stop()
 
-# Tentar abrir a planilha
-SPREADSHEET_ID = "1D4xID5FDYYNvpctagqpfIDagt74CeU2K"
+# Criar cliente da API Google Drive
 try:
-    sheet = client.open_by_key(SPREADSHEET_ID)
-    st.success("📄 Planilha acessada com sucesso!")
-    st.write("Abas disponíveis:", [ws.title for ws in sheet.worksheets()])
+    service = build("drive", "v3", credentials=credentials)
+    results = service.files().list(pageSize=10, fields="files(id, name)").execute()
+    files = results.get("files", [])
+
+    if not files:
+        st.warning("⚠️ Nenhum arquivo acessível foi encontrado.")
+    else:
+        st.success("📁 Arquivos acessíveis pela conta de serviço:")
+        for file in files:
+            st.write(f"📄 {file['name']} (ID: {file['id']})")
 except Exception as e:
-    st.error(f"❌ Falha ao acessar a planilha: {e}")
+    st.error(f"❌ Erro ao acessar Google Drive: {e}")
