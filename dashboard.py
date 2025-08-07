@@ -26,8 +26,37 @@ SHEET_NAMES = [
     "06_2025", "07_2025", "08_2025", "09_2025", "10_2025",
     "11_2025", "12_2025", "Gastos"
 ]
+import streamlit as st
+import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 
 @st.cache_data(show_spinner=False)
+def load_gsheet_data(sheet_names):
+    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    
+    # Lê o segredo salvo no secrets.toml do Streamlit Cloud
+    credentials = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes
+    )
+
+    client = gspread.authorize(credentials)
+    spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
+
+    all_data = []
+    for sheet_name in sheet_names:
+        try:
+            worksheet = spreadsheet.worksheet(sheet_name)
+            data = worksheet.get_all_records()
+            df = pd.DataFrame(data)
+            df["source_sheet"] = sheet_name
+            all_data.append(df)
+        except Exception as e:
+            st.warning(f"Erro ao ler aba {sheet_name}: {e}")
+
+    return pd.concat(all_data, ignore_index=True)
+
 def load_google_sheets_data(sheet_names):
     all_data = []
     for sheet in sheet_names:
@@ -119,7 +148,7 @@ def adjust_installment_dates(df):
 
 # Carregar dados
 st.title("📊 Dashboard Financeiro - Google Sheets")
-df_raw = load_google_sheets_data(SHEET_NAMES)
+df_raw = load_gsheet_data(SHEET_NAMES)
 df = adjust_installment_dates(df_raw)
 
 # Filtros
@@ -202,6 +231,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
