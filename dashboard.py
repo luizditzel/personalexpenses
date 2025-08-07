@@ -3,6 +3,10 @@ import pandas as pd
 import plotly.express as px
 import re
 from google.oauth2.service_account import Credentials
+from google.oauth2 import service_account
+import gspread
+
+
 
 # ID da planilha Google Sheets
 SPREADSHEET_ID = "1D4xID5FDYYNvpctagqpfIDagt74CeU2K"
@@ -35,13 +39,23 @@ from google.oauth2.service_account import Credentials
 @st.cache_data(show_spinner=False)
 def load_gsheet_data(sheet_names):
     # Autenticar
-    scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    credentials = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets.readonly",
+        "https://www.googleapis.com/auth/drive.readonly"
+    ]
+    credentials = service_account.Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=scopes
     )
     client = gspread.authorize(credentials)
 
+    try:
+        spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
+        st.success("✅ Planilha acessada com sucesso!")
+        st.write("Abas disponíveis:", [ws.title for ws in spreadsheet.worksheets()])
+    except Exception as e:
+        st.error(f"❌ Falha ao acessar a planilha: {e}")
+        st.stop()
     # Abrir planilha
     spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
     all_data = []
@@ -247,6 +261,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
