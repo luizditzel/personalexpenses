@@ -142,6 +142,9 @@ def load_google_sheets_data(sheet_names):
 
     if "Parcela" not in df.columns:
         df["Parcela"] = "1/1"
+    if "Amount" in df.columns:
+        st.write("Tipo da coluna Amount:", df["Amount"].dtype)
+    s   st.write(df["Amount"].head())
     df["Amount"] = (
         df["Amount"]
         .astype(str)                      # garante string
@@ -279,6 +282,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
