@@ -30,8 +30,8 @@ SHEET_NAMES = [
 @st.cache_data(show_spinner=False)
 def load_google_sheets_data(sheet_names):
     all_data = []
-    for sheet, gid in SHEET_GIDS.items():
-        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={gid}"
+    for sheet in sheet_names:
+        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet}"
 
         try:
             df = pd.read_csv(url, header=0, decimal=",")
@@ -50,11 +50,26 @@ def load_google_sheets_data(sheet_names):
 
     required_cols = ["Title", "Amount", "Transaction", "Category", "Date"]
     expected_cols = ["Title", "Amount", "Transaction", "Category", "Date", "Parcelas"]
+
+    df = pd.read_csv(url, header=0, decimal=",")
+    df.columns = [str(col).strip().capitalize() for col in df.columns]
+
+    # Tentar rebatizar colunas perdidas
+    rename_map = {
+        "Unnamed: 1": "Amount",
+        "Unnamed: 5": "Date",
+        "Parcela": "Parcelas"
+    }
+    df.rename(columns=rename_map, inplace=True)
+
+    # Manter apenas as colunas relevantes
+
     df = df[[col for col in df.columns if col in expected_cols or col == "source_sheet"]]
-    for col in required_cols:
-        if col not in df.columns:
-            st.error(f"Coluna obrigatória ausente: {col}")
-            st.stop()
+    if set(expected_cols[:5]).issubset(df.columns):
+        df["source_sheet"] = sheet
+        all_data.append(df)
+    else:
+        st.warning(f"❌ Colunas incompletas em '{sheet}': {df.columns.tolist()}")
 
     if "Parcelas" not in df.columns:
         df["Parcelas"] = "1/1"
@@ -183,6 +198,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
