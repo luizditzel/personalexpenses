@@ -38,55 +38,46 @@ from google.oauth2.service_account import Credentials
 
 @st.cache_data(show_spinner=False)
 def load_gsheet_data(sheet_names):
-    # Autenticar
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets.readonly",
         "https://www.googleapis.com/auth/drive.readonly"
     ]
-    credentials = service_account.Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
-    scopes=scopes
+    credentials = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes
     )
     client = gspread.authorize(credentials)
 
     try:
-        spreadsheet = client.open_by_key("11sqIUL4ZxuXG36GtmE7wDY3yaj8Czm2ulj5evM4Z1dI")
-        st.success("✅ Planilha acessada com sucesso!")
-        st.write("Abas disponíveis:", [ws.title for ws in spreadsheet.worksheets()])
-        st.write(f"✅ Aba carregada: {sheet_name} → colunas: {df.columns.tolist()}")
+        spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
+        st.success("📄 Planilha acessada com sucesso!")
     except Exception as e:
         st.error(f"❌ Falha ao acessar a planilha: {e}")
-        st.stop()
-    # Abrir planilha
-    #spreadsheet = client.open_by_key("1D4xID5FDYYNvpctagqpfIDagt74CeU2K")
+        return pd.DataFrame()
+
     all_data = []
 
     for sheet_name in sheet_names:
         try:
-            worksheet = spreadsheet.worksheet(sheet_name)
-            data = worksheet.get_all_values()
-            df = pd.DataFrame(data)
+            sheet = spreadsheet.worksheet(sheet_name)
+            records = sheet.get_all_records()
+            df = pd.DataFrame(records)
+            df.columns = make_unique(df.columns)
 
-            # Pular linhas em branco antes do header (detecta dinamicamente a linha com os nomes)
-            header_row_idx = df[df.iloc[:, 0] == "Title"].index
-            if header_row_idx.empty:
-                st.warning(f"❌ Header não encontrado na aba '{sheet_name}'")
-                continue
-            header_idx = header_row_idx[0]
-            df.columns = df.iloc[header_idx]
-            df = df.iloc[header_idx + 1:]
+            st.write(f"✅ Aba '{sheet_name}' carregada com colunas: {df.columns.tolist()}")
 
             df["source_sheet"] = sheet_name
             all_data.append(df)
         except Exception as e:
-            st.warning(f"Erro ao ler aba '{sheet_name}': {e}")
+            st.warning(f"⚠️ Falha ao carregar aba '{sheet_name}': {e}")
+            continue
 
     if not all_data:
         st.error("❌ Nenhuma aba foi carregada com sucesso.")
-        st.stop()
+        return pd.DataFrame()
 
-    df = pd.concat(all_data, ignore_index=True)
-    return df
+    df_final = pd.concat(all_data, ignore_index=True)
+    return df_final
 
 def load_google_sheets_data(sheet_names):
     all_data = []
@@ -262,6 +253,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
