@@ -5,6 +5,23 @@ import re
 
 # ID da planilha Google Sheets
 SPREADSHEET_ID = "1D4xID5FDYYNvpctagqpfIDagt74CeU2K"
+SHEET_GIDS = {
+    "01_2025": "1806065603",
+    "02_2025": "1340171258",
+    "03_2025":"849306397",
+    "04_2025":"463664931", 
+    "05_2025":"1657948975",
+    "06_2025":"1788816244", 
+    "07_2025":"1652161617", 
+    "08_2025":"586436483",
+    "09_2025":"1656386015", 
+    "10_2025":"346639885",
+    "11_2025":"1015052667", 
+    "12_2025":"1501299313", 
+    "Gastos":"2131411121",
+    ...
+}
+
 SHEET_NAMES = [
     "01_2025", "02_2025", "03_2025", "04_2025", "05_2025",
     "06_2025", "07_2025", "08_2025", "09_2025", "10_2025",
@@ -14,8 +31,9 @@ SHEET_NAMES = [
 @st.cache_data(show_spinner=False)
 def load_google_sheets_data(sheet_names):
     all_data = []
-    for sheet in sheet_names:
-        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet={sheet}"
+    for sheet, gid in SHEET_GIDS.items():
+        url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv&gid={gid}"
+
         try:
             df = pd.read_csv(url, header=0, decimal=",")
             df.columns = [str(col).strip().capitalize() for col in df.columns]
@@ -166,6 +184,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
