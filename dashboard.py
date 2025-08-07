@@ -18,8 +18,7 @@ SHEET_GIDS = {
     "10_2025":"346639885",
     "11_2025":"1015052667", 
     "12_2025":"1501299313", 
-    "Gastos":"2131411121",
-    ...
+    "Gastos":"2131411121"
 }
 
 SHEET_NAMES = [
@@ -184,6 +183,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
