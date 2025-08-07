@@ -40,9 +40,9 @@ def load_google_sheets_data(sheet_names):
                 st.warning(f"❌ Colunas insuficientes na aba '{sheet}': {df.columns.tolist()}")
             continue
 
-        df["source_sheet"] = sheet
-        all_data.append(df)
-        st.success(f"✅ Aba '{sheet}' lida com sucesso com {len(df)} linhas.")
+            df["source_sheet"] = sheet
+            all_data.append(df)
+            st.success(f"✅ Aba '{sheet}' lida com sucesso com {len(df)} linhas.")
 
         except Exception as e:
             st.error(f"❌ Erro ao carregar aba '{sheet}': {e}")
@@ -202,6 +202,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
