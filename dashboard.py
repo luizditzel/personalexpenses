@@ -35,7 +35,18 @@ import streamlit as st
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-
+def make_unique(columns):
+    counts = {}
+    new_columns = []
+    for col in columns:
+        col = str(col).strip()
+        if col in counts:
+            counts[col] += 1
+            new_columns.append(f"{col}_{counts[col]}")
+        else:
+            counts[col] = 0
+            new_columns.append(col)
+    return new_columns
 @st.cache_data(show_spinner=False)
 def load_gsheet_data(sheet_names):
     scopes = [
@@ -260,6 +271,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
