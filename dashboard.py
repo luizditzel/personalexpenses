@@ -95,12 +95,12 @@ def load_gsheet_data(sheet_names):
 
     # Tratamento da coluna Amount
     if "Amount" in df_final.columns:
-        df_final["Amount"] = (
-            df_final["Amount"]
-            .astype(str)
-           # .str.replace(".", "", regex=False)
-            .str.replace(",", ".", regex=False)
-        )
+        # df_final["Amount"] = (
+        #     df_final["Amount"]
+        #     .astype(str)
+        #    # .str.replace(".", "", regex=False)
+        #     .str.replace(",", ".", regex=False)
+        # )
         df_final["Amount"] = pd.to_numeric(df_final["Amount"], errors="coerce").fillna(0.0)
     else:
         st.error("❌ Coluna 'Amount' não encontrada após concatenação.")
@@ -286,6 +286,7 @@ st.download_button(
 # Tabela final
 st.subheader("📄 Detalhes das Transações")
 st.dataframe(df_filtered.sort_values(by="Date", ascending=False))
+
 
 
 
